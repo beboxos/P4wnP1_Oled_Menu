@@ -93,6 +93,27 @@ def send_ducky(command):
     '''
     os.system('echo '+command+' | python /home/pi/P4wnP1/duckencoder/duckencoder.py -l '+lang+' -p | python /home/pi/P4wnP1/hidtools/transhid.py')
 
+def send_file_ducky_delayed(file):    
+    '''
+    Send ducky script file to keyboard with extra delay value
+    exemple /home/pi/preset.txt 
+    '''
+    if HID_DELAY!="0":
+        with open(file) as file_object:
+            duckys=file_object.readlines()
+        DELCOM="DELAY "+HID_DELAY
+        for line in duckys:
+            if len(lines)>2:
+                if line[0:2]!="//" and line[0:3]!="REM":
+                    #print(line.replace("\n",""))
+                    send_ducky(line.replace("\n",""))
+                    if HID_DELAY!="1":
+                        #print(DELCOM)
+                        send_ducky(DELCOM)
+    else:
+        send_file_ducky(file)
+        
+    
 #
 def send_file_ducky(file):
     '''
@@ -294,7 +315,7 @@ msystem = ['BACK HOME MENU','REBOOT','INFORMATIONS','SHOW SSID AROUND','EDIT SET
 mhid =['BACK HOME MENU ['+lang.upper()+']','RUN AN ATTACK','TYPE TEXT FROM PRESET.TXT','SET HID TO LANGUAGE','SET HID EXTRA DELAY','BOOT HID AUTORUN SELECTION']
 malone=['BACK HOME MENU','HONEY POT WIFI SPOT #WIP#','FAKE WIFI AP KARMA EDITOR']
 keylang=['BACK HOME MENU','be','br','ca','ch','cs','de','dk','es','fi','fr','gb','hr','it','no','pt','tu','si','sv','tr','us']
-delais=['BACK HOME MENU','0','100','250','500','750','1000','1250','1500','1750','2000','2500','3000','3500','4000','4500','5000']
+delais=['BACK HOME MENU','0','1','250','500','750','1000','1250','1500','1750','2000','2500','3000','3500','4000','4500','5000']
 setupmenu=['BACK HOME MENU','USE_ECM','USE_RNDIS','USE_HID','USE_HID_MOUSE','USE_RAWHID','USE_UMS','WIFI_NEXMON','WIFI_ACCESSPOINT','WIFI_CLIENT','HID_KEYBOARD_TEST','AUTOSSH_ENABLED','BLUETOOTH_NAP']
 #--------------------------------------------------------------------
 #read karma
@@ -362,7 +383,7 @@ GPIO.setup(BRIGHT, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(BFIRE, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 menu(current,cur,18)
-owptext("       MetaSploit inside",maxline-2)
+#owptext("       MetaSploit inside",maxline-2)
 owptext("PAYLOAD: "+ACTIVE_PAYLOAD,maxline-1)
 disp.image(image)
 disp.display()
@@ -507,8 +528,9 @@ while exit==0:
         if cur>0 and lvl==5:
             #fire on attaque
             attaque="/home/pi/ducky/"+listattack[cur]+".txt"
-            print(attaque)
-            os.system('cat '+attaque+' | cat | python /home/pi/P4wnP1/duckencoder/duckencoder.py -l '+lang+' -p | python /home/pi/P4wnP1/hidtools/transhid.py')
+            #print(attaque)
+            send_file_ducky_delayed(attaque)
+            #os.system('cat '+attaque+' | cat | python /home/pi/P4wnP1/duckencoder/duckencoder.py -l '+lang+' -p | python /home/pi/P4wnP1/hidtools/transhid.py')
         if cur==1 and lvl==2:
             #RUN HID ATTACK
             cmd = "ls -F --format=single-column  /home/pi/ducky/*.txt"
@@ -578,7 +600,8 @@ while exit==0:
         if cur==2 and lvl==2:
 	        #preset text
             attaque="/home/pi/preset.txt"
-            os.system('cat '+attaque+' | cat  | python /home/pi/P4wnP1/duckencoder/duckencoder.py -l '+lang+' -p | python /home/pi/P4wnP1/hidtools/transhid.py')
+            send_file_ducky(attaque)
+            #os.system('cat '+attaque+' | cat  | python /home/pi/P4wnP1/duckencoder/duckencoder.py -l '+lang+' -p | python /home/pi/P4wnP1/hidtools/transhid.py')
         if cur==3 and lvl==2:
             # set to fr
             current=keylang
