@@ -9,7 +9,7 @@ from PIL import ImageFont
 import RPi.GPIO as GPIO 
 import os
 import subprocess
-
+import base64
 
 #import qrcode
 # variable boutons GPIOs
@@ -51,6 +51,10 @@ for line in lines:
     ligne=ligne+line.rstrip()+"\n"
 inis=ligne.split("\n")
 lang=inis[1].replace("lang=","")
+boothid=inis[2].replace("boothid=","")
+preset=inis[3].replace("preset=","")
+HID_BOOT_DELAY=inis[4].replace("HID_BOOT_DELAY=","")
+#print(inis) #debug
 # dans inis ona les valeurs exemple inis[1]--> lang=xx
 # Raspberry Pi pin configuration:
 RST = None     # on the PiOLED this pin isnt used
@@ -151,6 +155,11 @@ def ptext( str , line):
    disp.image(image)
    disp.display()
    return
+def sptext(str, line,fonte,couleur):
+   "This prints a passed string into lines 0 to 3, font and color 0 or 255"
+   #draw.rectangle((0,line*8+1,width,(line*8)+7), outline=0, fill=0) # delete line
+   draw.text((x, top+line*8+1), str ,  font=fonte, fill=couleur)  # write line
+   return    
 def owptext(str, line):
    "This prints a passed string into lines 0 to 3"
    #draw.rectangle((0,line*8+1,width,(line*8)+7), outline=0, fill=0) # delete line
@@ -293,6 +302,12 @@ def refresh_setup_menu():
     #setupmenu[14]='FTP_SERVER : '+FTP_SERVER.upper()
     #setupmenu[15]='MOUNT_UMS : '+MOUNT_UMS.upper()
     
+def writeini():
+    filename="/home/pi/menu.ini"
+    with open(filename, 'w') as fsetup: 
+        for ind in range(0,5):
+            fsetup.write(inis[ind]+"\n")   
+    
 def writekarma():
     filename="/home/pi/P4wnP1/payloads/nexmon/karma.txt"
     with open(filename, 'w') as fsetup:
@@ -310,13 +325,14 @@ time.sleep(5)
 clearlcd()
 # here we go
 screensaver=0
-mprincipal = ['        -= P4wnP1 =- ','SYSTEM ACTIONS','HID ATTACKS','STAND ALONE ATTACKS','EXIT TO SYSTEM']
+mprincipal = ['      .:: P4wnP1 ::. ','SYSTEM ACTIONS','HID ATTACKS','STAND ALONE ATTACKS','EXIT TO SYSTEM']
 msystem = ['BACK HOME MENU','REBOOT','INFORMATIONS','SHOW SSID AROUND','EDIT SETUP.CFG VARS','SET BOOT PAYLOAD']
 mhid =['BACK HOME MENU ['+lang.upper()+']','RUN AN ATTACK','TYPE TEXT FROM PRESET.TXT','SET HID TO LANGUAGE','SET HID EXTRA DELAY','BOOT HID AUTORUN SELECTION']
 malone=['BACK HOME MENU','HONEY POT WIFI SPOT #WIP#','FAKE WIFI AP KARMA EDITOR']
 keylang=['BACK HOME MENU','be','br','ca','ch','cs','de','dk','es','fi','fr','gb','hr','it','no','pt','tu','si','sv','tr','us']
 delais=['BACK HOME MENU','0','1','250','500','750','1000','1250','1500','1750','2000','2500','3000','3500','4000','4500','5000']
 setupmenu=['BACK HOME MENU','USE_ECM','USE_RNDIS','USE_HID','USE_HID_MOUSE','USE_RAWHID','USE_UMS','WIFI_NEXMON','WIFI_ACCESSPOINT','WIFI_CLIENT','HID_KEYBOARD_TEST','AUTOSSH_ENABLED','BLUETOOTH_NAP']
+bootauto=['BACK HOME MENU ['+str(HID_BOOT_DELAY)+' ms]','SELECT HID PAYLOAD','SELECT BOOT WAITING TIME','CLEAR HID AUTO RUN']
 #--------------------------------------------------------------------
 #read karma
 with open("/home/pi/P4wnP1/payloads/nexmon/karma.txt") as file_object:
@@ -381,9 +397,16 @@ GPIO.setup(BDOWN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(BLEFT, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(BRIGHT, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(BFIRE, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-
+#AUTO RUN COMMAND BEFORE MENU
+if boothid!="":
+    time.sleep(int(HID_BOOT_DELAY)/1000)
+    send_file_ducky(boothid)
+    
 menu(current,cur,18)
-#owptext("       MetaSploit inside",maxline-2)
+if boothid.replace("boothid=","")!="":
+    owptext("RUN HID: "+boothid.replace("boothid=","").replace("/home/pi/ducky/","").replace(".txt","").replace("_"," "),maxline-2)
+else:
+    owptext("RUN HID: Nothing to run",maxline-2)
 owptext("PAYLOAD: "+ACTIVE_PAYLOAD,maxline-1)
 disp.image(image)
 disp.display()
@@ -619,6 +642,67 @@ while exit==0:
             current=delais
             cur=0
             lvl=9
+        if cur==5 and lvl==2:  
+            #call auto boot hid menu
+            current=bootauto
+            cur=0
+            lvl=10
+        if cur==1 and lvl==10:
+            #select hid to run at boot
+            cmd = "ls -F --format=single-column  /home/pi/ducky/*.txt"
+            listattack=subprocess.check_output(cmd, shell = True )
+            listattack=listattack.replace("/home/pi/ducky/","/home/pi/ducky/BACK TO MAIN\n/home/pi/ducky/",1)
+            listattack=listattack.replace(".txt","")
+            listattack=listattack.replace("/home/pi/ducky/","")
+            listattack=listattack.split("\n")
+            current=listattack
+            cur=0
+            lvl=11
+        if cur>0 and lvl==11:
+            #write payload on ini for running on next boot
+            #boothid=inis[2].replace("boothid=","")
+            print("/home/pi/ducky/"+listattack[cur]+".txt")
+            inis[2]="boothid=/home/pi/ducky/"+listattack[cur]+".txt"
+            boothid=inis[2]
+            writeini()
+            clearlcd()
+            ptext("BOOT HID: " + listattack[cur],4)
+            current=mprincipal
+            cur=0
+            lvl=0
+            time.sleep(3)
+        if cur==2 and lvl==10:
+            #select extra time to wait at boot
+            #normaly to 0ms but this can go up to 5000 ms wait
+            #before run the attack
+            current=delais
+            cur=0
+            lvl=12
+        if cur==3 and lvl==10:
+            #reset auto boot to empty value
+            boothid="boothid="
+            inis[2]="boothid="
+            writeini()
+            clearlcd()
+            ptext("BOOT HID: Empty, nothing",4)
+            current=mprincipal
+            cur=0
+            lvl=0
+            time.sleep(3)
+        if cur>0 and lvl==12:
+            # boot delay selected
+            # need to write on menu.ini the value
+            #HID_BOOT_DELAY=inis[4].replace("HID_BOOT_DELAY=","")
+            HID_BOOT_DELAY=delais[cur]
+            inis[4]="HID_BOOT_DELAY="+str(HID_BOOT_DELAY)
+            bootauto[0]='BACK HOME MENU ['+str(HID_BOOT_DELAY)+' ms]'
+            writeini()
+            current=bootauto
+            cur=0
+            lvl=10
+            clearlcd()
+            ptext("BOOT DELAY SET TO : " + str(HID_BOOT_DELAY)+" ms",4)
+            time.sleep(3)
         if cur>0 and lvl==9:
             #delay selection
             HID_DELAY=delais[cur]
@@ -701,6 +785,10 @@ while exit==0:
         #showmenu(current,cur)
         menu(current,cur,cur+18)
         if current==mprincipal:
+            if boothid!="":
+                owptext("RUN HID: "+boothid.replace("boothid=","").replace("/home/pi/ducky/","").replace(".txt","").replace("_"," "),maxline-2)
+            else:
+                owptext("RUN HID: Nothing to run",maxline-2)
             ptext("PAYLOAD: "+ACTIVE_PAYLOAD,maxline-1)
         clic="FIRE"		
     if clic<>"":
